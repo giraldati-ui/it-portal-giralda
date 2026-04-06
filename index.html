@@ -30,9 +30,7 @@
     <div id="login-screen" class="fixed inset-0 z-[200] flex items-center justify-center bg-[#f5f5f7]">
         <div class="bg-white/90 backdrop-blur-xl p-10 w-full max-w-sm rounded-[40px] text-center shadow-2xl">
             <img src="logo.png" class="h-24 mx-auto mb-4 object-contain" alt="Logo">
-            
             <h2 class="text-xl font-bold text-gray-600 mb-8 tracking-tight">Análisis de costos IT</h2>
-            
             <div class="space-y-4">
                 <input type="text" id="user-input" class="w-full p-4 rounded-2xl bg-gray-100 outline-none text-center" placeholder="Usuario">
                 <input type="password" id="pass-input" onkeydown="if(event.key==='Enter') handleLogin()" class="w-full p-4 rounded-2xl bg-gray-100 outline-none text-center" placeholder="Contraseña">
@@ -83,7 +81,7 @@
                     <canvas id="mainChart"></canvas>
                 </div>
                 <div class="card-kpi h-[400px] col-span-4 w-full">
-                    <p class="text-[11px] font-bold text-gray-400 uppercase mb-4">Balance General Q1</p>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase mb-4">Balance General</p>
                     <canvas id="compareChart"></canvas>
                 </div>
             </div>
@@ -167,33 +165,30 @@
         function renderDashboard() {
             const p = fullData.planificado;
             const c = fullData.consumos;
-            const planQ1 = cleanNum(p.Enero) + cleanNum(p.Febrero) + cleanNum(p.Marzo);
+            const mesesConData = [...new Set(c.map(item => item.Mes))];
+            const planAcumulado = mesesConData.reduce((acc, mes) => acc + cleanNum(p[mes]), 0);
             const planAnual = Object.values(p).reduce((acc, v) => acc + cleanNum(v), 0);
-            const realQ1 = c.filter(i => ['Enero', 'Febrero', 'Marzo'].includes(i.Mes)).reduce((acc, i) => acc + cleanNum(i.Monto_USD), 0);
             const realTotal = c.reduce((acc, v) => acc + cleanNum(v.Monto_USD), 0);
-            const diffQ1 = planQ1 - realQ1;
+            const diffAcumulada = planAcumulado - realTotal;
 
-            document.getElementById('kpi-plan-q1').innerText = `$${planQ1.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
-            document.getElementById('kpi-real-act').innerText = `$${realQ1.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
-            document.getElementById('kpi-diff-q1').innerText = `$${diffQ1.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
-            document.getElementById('kpi-perc-q1').innerText = (planQ1 > 0 ? (diffQ1 / planQ1) * 100 : 0).toFixed(1) + '%';
+            document.getElementById('kpi-plan-q1').innerText = `$${planAcumulado.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
+            document.getElementById('kpi-real-act').innerText = `$${realTotal.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
+            document.getElementById('kpi-diff-q1').innerText = `$${diffAcumulada.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
+            document.getElementById('kpi-perc-q1').innerText = (planAcumulado > 0 ? (diffAcumulada / planAcumulado) * 100 : 0).toFixed(1) + '%';
             document.getElementById('kpi-dispo').innerText = `$${(planAnual - realTotal).toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
             document.getElementById('kpi-anual').innerText = `$${planAnual.toLocaleString('de-DE', {minimumFractionDigits: 2})}`;
 
             const axisStyle = { ticks: { font: { size: 14, weight: 'bold' }, color: '#374151' } };
+            const labelsGrafico = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].filter(m => p[m] || c.some(i => i.Mes === m));
 
             if(charts.main) charts.main.destroy();
             charts.main = new Chart(document.getElementById('mainChart'), {
                 type: 'line',
                 data: {
-                    labels: ['Enero', 'Febrero', 'Marzo'],
+                    labels: labelsGrafico,
                     datasets: [
-                        { label: 'Planificado', data: [cleanNum(p.Enero), cleanNum(p.Febrero), cleanNum(p.Marzo)], borderColor: '#FFCC80', borderWidth: 4, fill: false, tension: 0.1, datalabels: { display: false } }, 
-                        { label: 'Ejecutado', data: [
-                            c.filter(i=>i.Mes==='Enero').reduce((s,v)=>s+cleanNum(v.Monto_USD), 0),
-                            c.filter(i=>i.Mes==='Febrero').reduce((s,v)=>s+cleanNum(v.Monto_USD), 0),
-                            c.filter(i=>i.Mes==='Marzo').reduce((s,v)=>s+cleanNum(v.Monto_USD), 0)
-                        ], borderColor: '#0071e3', tension: 0.4, fill: true, backgroundColor: 'rgba(0,113,227,0.05)', datalabels: { display: false } }
+                        { label: 'Planificado', data: labelsGrafico.map(m => cleanNum(p[m])), borderColor: '#FFCC80', borderWidth: 4, fill: false, tension: 0.4, datalabels: { display: false } }, 
+                        { label: 'Ejecutado', data: labelsGrafico.map(m => c.filter(i => i.Mes === m).reduce((s, v) => s + cleanNum(v.Monto_USD), 0)), borderColor: '#0071e3', tension: 0.4, fill: true, backgroundColor: 'rgba(0,113,227,0.05)', datalabels: { display: false } }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: axisStyle, y: { ticks: { callback: formatDollarAxis } } } }
@@ -205,7 +200,7 @@
                 data: {
                     labels: ['Plan', 'Real', 'Ahorro'],
                     datasets: [{
-                        data: [planQ1, realQ1, diffQ1],
+                        data: [planAcumulado, realTotal, diffAcumulada],
                         backgroundColor: ['#FFCC80', '#0071e3', '#4ade80'],
                         borderRadius: 8
                     }]
@@ -241,7 +236,7 @@
                             backgroundColor: '#fff',
                             borderRadius: 4,
                             color: '#0071e3',
-                            font: { weight: 'bold', size: 11 },
+                            font: { weight: 'bold', size: 14 }, // Mantenemos el tamaño 14 solicitado previamente
                             formatter: (v) => '$' + Math.round(v).toLocaleString('de-DE')
                         }
                     }]
@@ -261,12 +256,16 @@
             const body = document.getElementById('dev-table-body');
             if (!body) return;
             body.innerHTML = '';
-            ['Enero', 'Febrero', 'Marzo'].forEach(mes => {
+            const mesesDelAño = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const mesesActivos = mesesDelAño.filter(m => cleanNum(fullData.planificado[m]) > 0 || fullData.consumos.some(i => i.Mes === m));
+
+            mesesActivos.forEach(mes => {
                 const plan = cleanNum(fullData.planificado[mes]);
                 const real = fullData.consumos.filter(i => i.Mes === mes).reduce((s, v) => s + cleanNum(v.Monto_USD), 0);
                 const desv = plan - real;
                 const perc = plan > 0 ? (desv/plan)*100 : 0;
-                body.innerHTML += `<tr><td class="font-bold text-gray-800">${mes}</td><td>$${plan.toLocaleString('de-DE')}</td><td>$${real.toLocaleString('de-DE')}</td><td class="${desv>=0?'text-green-600':'text-red-600'} font-bold">$${desv.toLocaleString('de-DE')}</td><td>${perc.toFixed(1)}%</td><td><span class="px-2 py-1 rounded-full text-[10px] font-bold ${desv>=0?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${desv>=0?'AHORRO':'GASTO'}</span></td></tr>`;
+                // CORRECCIÓN: Etiquetas de status ligeramente más grandes (text-xs)
+                body.innerHTML += `<tr><td class="font-bold text-gray-800">${mes}</td><td>$${plan.toLocaleString('de-DE')}</td><td>$${real.toLocaleString('de-DE')}</td><td class="${desv>=0?'text-green-600':'text-red-600'} font-bold">$${desv.toLocaleString('de-DE')}</td><td>${perc.toFixed(1)}%</td><td><span class="px-3 py-1.5 rounded-full text-xs font-bold ${desv>=0?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${desv>=0?'AHORRO':'GASTO'}</span></td></tr>`;
             });
         }
     </script>
